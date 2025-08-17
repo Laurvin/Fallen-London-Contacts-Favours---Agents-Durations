@@ -2,8 +2,8 @@
 // @name Fallen London - Contacts Favours & Agents Durations
 // @namespace Fallen London - Contacts Favours
 // @author Laurvin
-// @description Shows the Favours and Agents duration to the right or top of the page; will check every 15 seconds if the data is still there. To refresh click anywhere in the area, te relocate click the compass.
-// @version 6.01
+// @description Shows the Favours and Agents duration to the right or top of the page; will check every 10 seconds if the data is still there. To refresh click anywhere in the area, te relocate click the compass.
+// @version 6.2
 // @icon http://i.imgur.com/XYzKXzK.png
 // @downloadURL https://github.com/Laurvin/Fallen-London-Contacts-Favours/raw/master/Fallen_London_Contacts_Favours.user.js
 // @updateURL https://github.com/Laurvin/Fallen-London-Contacts-Favours/raw/master/Fallen_London_Contacts_Favours.user.js
@@ -12,6 +12,7 @@
 // @require http://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js
 // @grant GM_setValue
 // @grant GM_getValue
+// @grant GM_registerMenuCommand
 // @run-at document-idle
 // ==/UserScript==
 
@@ -30,7 +31,9 @@ function addGlobalStyle(name, css) {
 
 function addHTMLElements(divLocation) {
     addGlobalStyle('RightFLCF', '#RightFLCF { width: auto; margin: 18px 2px -17px 2px; text-align: center; font-size: 14px; }');
-    addGlobalStyle('TopFLCF', '#TopFLCF { width: auto; margin-top: 7px; font-size: 14px; }');
+    addGlobalStyle('TopFLCF', '#TopFLCF { width: 72%; margin: 7px 0px; font-size: 14px; }');
+    addGlobalStyle('FLCFGrid', '#FLCF { display: grid; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); column-gap: 0.3rem; row-gap: 0.2rem;; }');
+    addGlobalStyle('FLCFItems', '#FLCF .item { display: flex; align-items: center; }');
 
     $('#RightFLCF').remove();
     $('#TopFLCF').remove();
@@ -47,13 +50,7 @@ function addHTMLElements(divLocation) {
         MoveButtonLocation = "top";
     }
 
-    $('#ContainerFLCF').append('<span id="FLCF" title="You can click anywhere here, up to the relocation button to reload."> Loading Contact Favours... &nbsp;</span><span id="MoveFLCF" title="Click here to move favours from top bar to under Travel button and vice versa."><img height="20" width="20" border="0" src="https://images.fallenlondon.com/icons/compasssmall.png" /></span>');
-
-    $('#MoveFLCF').click(function(event) {
-        event.preventDefault();
-        $('#ContainerFLCF').empty();
-        updateFavours(MoveButtonLocation);
-    });
+    $('#ContainerFLCF').append('<div id="FLCF" title="You can click anywhere here to reload. To move the icons to the top or right, use the Tampermonkey menu.">Loading Contact Favours...</div>');
 }
 
 function fetchFavoursData(callback) {
@@ -136,19 +133,19 @@ function GetFavours() {
 
         var CreatedHTML = "";
         $.each(Favours, function(faction, amount) {
-            CreatedHTML += '<span><img height="20" width="20" border="0" src="https://images.fallenlondon.com/icons/' + FactionIcon[faction] + 'small.png" />&nbsp;' + amount + '</span> &nbsp; ';
+            CreatedHTML += '<div class="item reload"><img height="20" width="20" border="0" src="https://images.fallenlondon.com/icons/' + FactionIcon[faction] + 'small.png" />&nbsp;' + amount + '</div>';
         });
 
         if (tasteGarden > 0) {
-            CreatedHTML += '<img height="20" width="20" border="0" src="https://images.fallenlondon.com/icons/foliagesmall.png" />&nbsp;' + tasteGarden + ' &nbsp; ';
+            CreatedHTML += '<div class="item reload"><img height="20" width="20" border="0" src="https://images.fallenlondon.com/icons/foliagesmall.png" />&nbsp;' + tasteGarden + '</div>';
         }
 
         if (MySelfData.character.mantelpieceItem.image) {
-            CreatedHTML += '<img height="20" width="20" border="0" src="https://images.fallenlondon.com/icons/' + MySelfData.character.mantelpieceItem.image + 'small.png" />&nbsp;' + MySelfData.character.mantelpieceItem.effectiveLevel + ' &nbsp; ';
+            CreatedHTML += '<div class="item reload"><img height="20" width="20" border="0" src="https://images.fallenlondon.com/icons/' + MySelfData.character.mantelpieceItem.image + 'small.png" />&nbsp;' + MySelfData.character.mantelpieceItem.effectiveLevel + '</div>';
         }
 
         if (MySelfData.character.scrapbookStatus.image) {
-            CreatedHTML += '<img height="20" width="20" border="0" src="https://images.fallenlondon.com/icons/' + MySelfData.character.scrapbookStatus.image + 'small.png" />&nbsp;' + MySelfData.character.scrapbookStatus.effectiveLevel + ' &nbsp; ';
+            CreatedHTML += '<div class="item reload"><img height="20" width="20" border="0" src="https://images.fallenlondon.com/icons/' + MySelfData.character.scrapbookStatus.image + 'small.png" />&nbsp;' + MySelfData.character.scrapbookStatus.effectiveLevel + '</div>';
         }
 
         fetchAgentsData(function(agentErr, agentsData) {
@@ -160,12 +157,13 @@ function GetFavours() {
                     }
                     var imgSrc = agent.image ? 'https://images.fallenlondon.com/icons/' + agent.image + 'small.png' : '';
                     if (imgSrc) {
-                        CreatedHTML += '<img height="20" width="20" border="0" src="' + imgSrc + '" />&nbsp;' + remaining + ' &nbsp; ';
+                        CreatedHTML += '<div class="item reload"><img height="20" width="20" border="0" src="' + imgSrc + '" />&nbsp;' + remaining + '</div>';
                     }
                 });
             }
+
             $("#FLCF").html(CreatedHTML);
-            $('#FLCF').click(function(event) {
+            $('.item.reload').click(function(event) {
                 event.preventDefault();
                 $('#FLCF').text("Loading Contact Favours...");
                 GetFavours();
@@ -184,5 +182,25 @@ function updateFavours(divLocation) {
 $(document).ready(function() {
     'use strict';
     var divLocation = GM_getValue("divLocation", 'right');
-    setInterval(updateFavours, 15000, divLocation);
+
+    // Menu to change the choice
+    const KEY = 'divLocation'; // storage key
+    const DEFAULT = 'right'; // starting value if none saved
+    const ALT = { right: 'top', top: 'right' };
+
+    // Read saved value (or use default)
+    let current = GM_getValue(KEY, DEFAULT);
+
+    // Apply immediately
+    updateFavours(current);
+
+    // Menu to toggle
+    GM_registerMenuCommand(`Position: ${current} (toggle)`, async () => {
+        current = ALT[current]; // flip the value
+        await GM_setValue(KEY, current);
+        updateFavours(current);
+        Optional: alert(`You will need to reload the page to move the icons to the ${current}`);
+    });
+
+    setInterval(updateFavours, 10000, divLocation);
 });
