@@ -3,7 +3,7 @@
 // @namespace Fallen London - Contacts Favours
 // @author Laurvin
 // @description Shows the Favours and Agents duration to the right or top of the page; will check every 10 seconds if the data is still there. To refresh click anywhere in the area, te relocate click the compass.
-// @version 6.2
+// @version 6.3
 // @icon http://i.imgur.com/XYzKXzK.png
 // @downloadURL https://github.com/Laurvin/Fallen-London-Contacts-Favours/raw/master/Fallen_London_Contacts_Favours.user.js
 // @updateURL https://github.com/Laurvin/Fallen-London-Contacts-Favours/raw/master/Fallen_London_Contacts_Favours.user.js
@@ -64,7 +64,7 @@ function fetchFavoursData(callback) {
             "authorization": "Bearer " + access_token,
             "accept": "application/json, text/plain, */*"
         },
-        timeout: 10000,
+        timeout: 20000,
         success: function(result) {
             callback(null, result);
         },
@@ -85,7 +85,7 @@ function fetchAgentsData(callback) {
             "authorization": "Bearer " + access_token,
             "accept": "application/json, text/plain, */*"
         },
-        timeout: 10000,
+        timeout: 20000,
         success: function(result) {
             callback(null, result);
         },
@@ -156,7 +156,7 @@ function GetFavours() {
                         remaining = agent.plot.duration - agent.plot.elapsed;
                     }
                     var imgSrc = agent.image ? 'https://images.fallenlondon.com/icons/' + agent.image + 'small.png' : '';
-                    if (imgSrc) {
+                    if (imgSrc && remaining > 0) {
                         CreatedHTML += '<div class="item reload"><img height="20" width="20" border="0" src="' + imgSrc + '" />&nbsp;' + remaining + '</div>';
                     }
                 });
