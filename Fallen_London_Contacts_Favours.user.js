@@ -3,7 +3,7 @@
 // @namespace Fallen London - Contacts Favours
 // @author Laurvin
 // @description Shows the Favours and Agents duration to the right or top of the page. Data is read passively from the game's own API calls; click anywhere in the area to force a manual refresh, to relocate use the Tampermonkey menu.
-// @version 7.0
+// @version 7.3
 // @icon http://i.imgur.com/XYzKXzK.png
 // @downloadURL https://github.com/Laurvin/Fallen-London-Contacts-Favours/raw/master/Fallen_London_Contacts_Favours.user.js
 // @updateURL https://github.com/Laurvin/Fallen-London-Contacts-Favours/raw/master/Fallen_London_Contacts_Favours.user.js
@@ -36,7 +36,6 @@ var FLData = {
     mantel: null,
     scrapbook: null,
     agents: null,
-    agentActionsSpent: 0,
     lastActions: null,
     branchCosts: {}
 };
@@ -84,8 +83,9 @@ resetFavours();
                 } else if (url.indexOf('/api/storylet') !== -1) {
                     data = JSON.parse(this.responseText);
                     if (data) recordBranchCosts(data);
-                } else if (/\/api\/agents(\?|$)/.test(url)) {
+                } else if (url.indexOf('/api/agents') !== -1) {
                     data = JSON.parse(this.responseText);
+                    console.log('FLCF: agents-related response intercepted: ' + url);
                     if (data) onAgentsData(data);
                 }
             } catch (e) {}
@@ -227,7 +227,9 @@ function onBranchData(data, requestBody) {
 
     var render = false;
     if (FLData.agents && spent > 0) {
-        FLData.agentActionsSpent += spent;
+        FLData.agents.forEach(function(agent) {
+            agent._flcfSpent = (agent._flcfSpent || 0) + spent;
+        });
         render = true;
     }
 
@@ -274,11 +276,39 @@ function recordBranchCosts(data) {
     });
 }
 
+// A fresh, authoritative snapshot for an agent means duration/elapsed are
+// current as of right now, so any locally-accumulated spend count for it is
+// discarded and restarts from zero.
+function resetAgentSpent(agent) {
+    agent._flcfSpent = 0;
+}
+
+// Accepts the full {agents: [...]} list from GET /api/agents, or a single
+// updated agent object (however an assign/plot-change endpoint returns it:
+// as the bare object, or nested under an 'agent' key) and merges it into the
+// stored list by id, so a partial response only refreshes the agent it names.
 function onAgentsData(data, source) {
-    if (!data || !Array.isArray(data.agents)) return;
-    console.log('FLCF: agents data obtained via ' + (source || 'interception'));
-    FLData.agents = data.agents;
-    FLData.agentActionsSpent = 0;
+    if (!data) return;
+
+    if (Array.isArray(data.agents)) {
+        console.log('FLCF: agents data obtained via ' + (source || 'interception'));
+        data.agents.forEach(resetAgentSpent);
+        FLData.agents = data.agents;
+        RenderFavours();
+        return;
+    }
+
+    var incoming = (data.agent && typeof data.agent === 'object') ? data.agent : data;
+    if (!incoming || typeof incoming.id === 'undefined' || !incoming.plot) return;
+
+    console.log('FLCF: single agent update obtained via ' + (source || 'interception') + ' (id ' + incoming.id + ')');
+    resetAgentSpent(incoming);
+    if (!FLData.agents) FLData.agents = [];
+    var idx = -1;
+    for (var i = 0; i < FLData.agents.length; i++) {
+        if (FLData.agents[i].id === incoming.id) { idx = i; break; }
+    }
+    if (idx >= 0) FLData.agents[idx] = incoming; else FLData.agents.push(incoming);
     RenderFavours();
 }
 
@@ -410,7 +440,7 @@ function RenderFavours() {
         FLData.agents.forEach(function(agent) {
             var remaining = 0;
             if (agent.plot && typeof agent.plot.duration === 'number' && typeof agent.plot.elapsed === 'number') {
-                remaining = agent.plot.duration - agent.plot.elapsed - FLData.agentActionsSpent;
+                remaining = agent.plot.duration - agent.plot.elapsed - (agent._flcfSpent || 0);
                 if (remaining < 0) remaining = 0;
             }
             var imgSrc = agent.image ? 'https://images.fallenlondon.com/icons/' + agent.image + 'small.png' : '';
